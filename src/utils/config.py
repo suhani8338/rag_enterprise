@@ -11,7 +11,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import yaml
 
@@ -60,6 +60,33 @@ class RetrievalConfig:
     mmr_lambda: float
     final_k:    int
 
+# ── Phase 2 dataclasses ───────────────────────────────────────────────────────
+
+@dataclass
+class LLMConfig:
+    provider:    str
+    model:       str
+    base_url:    str
+    temperature: float
+    max_tokens:  int
+
+@dataclass
+class RerankerConfig:
+    model_name: str
+    top_n:      int
+    device:     str
+
+@dataclass
+class QueryRewritingConfig:
+    enabled:      bool
+    num_variants: int
+
+@dataclass
+class RAGConfig:
+    default_persona:   str
+    max_context_chars: int
+    cite_sources:      bool
+
 @dataclass
 class Settings:
     project_name:    str
@@ -70,6 +97,11 @@ class Settings:
     embedding:       EmbeddingConfig
     vectorstore:     VectorstoreConfig
     retrieval:       RetrievalConfig
+    # Phase 2 (Optional — populated when present in yaml)
+    llm:             Optional[LLMConfig]              = field(default=None)
+    reranker:        Optional[RerankerConfig]         = field(default=None)
+    query_rewriting: Optional[QueryRewritingConfig]   = field(default=None)
+    rag:             Optional[RAGConfig]              = field(default=None)
     project_root:    Path = field(default_factory=lambda: PROJECT_ROOT)
 
 
@@ -106,6 +138,42 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
         format  = log["format"],
     )
 
+    # Phase 2 — only parse if present in yaml
+    llm_cfg = reranker_cfg = qr_cfg = rag_cfg = None
+
+    if "llm" in raw:
+        l = raw["llm"]
+        llm_cfg = LLMConfig(
+            provider    = l["provider"],
+            model       = l["model"],
+            base_url    = l["base_url"],
+            temperature = l["temperature"],
+            max_tokens  = l["max_tokens"],
+        )
+
+    if "reranker" in raw:
+        r = raw["reranker"]
+        reranker_cfg = RerankerConfig(
+            model_name = r["model_name"],
+            top_n      = r["top_n"],
+            device     = r["device"],
+        )
+
+    if "query_rewriting" in raw:
+        q = raw["query_rewriting"]
+        qr_cfg = QueryRewritingConfig(
+            enabled      = q["enabled"],
+            num_variants = q["num_variants"],
+        )
+
+    if "rag" in raw:
+        rc = raw["rag"]
+        rag_cfg = RAGConfig(
+            default_persona   = rc["default_persona"],
+            max_context_chars = rc["max_context_chars"],
+            cite_sources      = rc["cite_sources"],
+        )
+
     return Settings(
         project_name    = raw["project"]["name"],
         project_version = raw["project"]["version"],
@@ -135,6 +203,10 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
             mmr_lambda = ret["mmr_lambda"],
             final_k    = ret["final_k"],
         ),
+        llm             = llm_cfg,
+        reranker        = reranker_cfg,
+        query_rewriting = qr_cfg,
+        rag             = rag_cfg,
     )
 
 

@@ -21,7 +21,6 @@ import time
 from typing import List, Optional
 
 from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
 
 from src.utils.config import settings
 from src.utils.logger import get_logger, log_metrics, timed
@@ -41,6 +40,8 @@ class LocalEmbedder:
         device:     Optional[str] = None,
         batch_size: Optional[int] = None,
     ):
+        from langchain_huggingface import HuggingFaceEmbeddings
+        
         cfg = settings.embedding
         self.model_name = model_name or cfg.model_name
         self.device     = device     or cfg.device

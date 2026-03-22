@@ -45,3 +45,29 @@ retrieval:
 logging:
   level: "INFO"
   format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+
+# ── PHASE 2 ───────────────────────────────────────────────────────────────────
+
+llm:
+  # Ollama runs locally — install from https://ollama.com then: ollama pull mistral
+  provider: "ollama"
+  model: "mistral"
+  base_url: "http://localhost:11434"
+  temperature: 0.1          # Low = factual, deterministic answers
+  max_tokens: 1024
+
+reranker:
+  # Free HuggingFace cross-encoder — downloaded once (~80MB), runs offline
+  model_name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  top_n: 4                  # Final chunks after re-ranking
+  device: "cpu"
+
+query_rewriting:
+  enabled: true
+  num_variants: 3           # How many rewritten queries to generate
+
+rag:
+  # Persona options: "analyst", "executive", "engineer", "hr"
+  default_persona: "analyst"
+  max_context_chars: 6000   # Total chars fed to LLM (stay under context window)
+  cite_sources: true        # Append [source: filename, page N] to answers

@@ -23,9 +23,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import chromadb
 import numpy as np
-from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
@@ -46,6 +44,19 @@ class ChromaVectorStore:
         persist_directory: Optional[Path] = None,
         collection_name:   Optional[str]  = None,
     ):
+        # Patch sys.modules to provide a mock onnxruntime to prevent chromadb import errors
+        import sys
+        import types
+        
+        if 'onnxruntime' not in sys.modules:
+            # Create a mock onnxruntime module for chromadb's default embedding function
+            sys.modules['onnxruntime'] = types.ModuleType('onnxruntime')
+            sys.modules['onnxruntime.capi'] = types.ModuleType('onnxruntime.capi')
+            sys.modules['onnxruntime.capi._pybind_state'] = types.ModuleType('onnxruntime.capi._pybind_state')
+        
+        import chromadb
+        from langchain_chroma import Chroma
+        
         cfg = settings.vectorstore
         self.persist_dir      = persist_directory or settings.paths.chroma_db
         self.collection_name  = collection_name   or cfg.collection_name
