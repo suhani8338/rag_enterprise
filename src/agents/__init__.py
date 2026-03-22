@@ -1,0 +1,1 @@
+# agents package — Phase 3 multi-agent orchestration
