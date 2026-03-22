@@ -1,0 +1,44 @@
+ACME CORPORATION — ANNUAL REPORT 2024
+======================================
+
+EXECUTIVE SUMMARY
+-----------------
+Acme Corporation delivered a record-breaking fiscal year 2024, with total revenue
+reaching $4.2 billion, representing 18% year-over-year growth. Our cloud division
+surpassed $1 billion in ARR for the first time in company history.
+
+FINANCIAL HIGHLIGHTS
+--------------------
+- Total Revenue:        $4.2B (+18% YoY)
+- Gross Profit Margin:  68.4% (vs 64.1% prior year)
+- Operating Income:     $840M (+22% YoY)
+- Free Cash Flow:       $610M
+- R&D Investment:       $520M (12.4% of revenue)
+
+BUSINESS SEGMENTS
+-----------------
+1. Cloud Services ($1.1B revenue, +41% YoY)
+   Our cloud platform now serves 15,000 enterprise customers across 42 countries.
+   Key products: AcmeCloud Compute, AcmeDB, AcmeMesh (service mesh).
+   Net Revenue Retention: 128% (up from 118%).
+
+2. Enterprise Software ($1.9B revenue, +8% YoY)
+   Legacy on-premise ERP and CRM suites remain the largest segment.
+   Migration to SaaS is accelerating with 34% of the base now on AcmeCloud.
+
+3. Professional Services ($1.2B revenue, +12% YoY)
+   Implementation and consulting revenues grew as cloud migration projects
+   accelerated. Utilisation rate held at 76%.
+
+STRATEGY & OUTLOOK
+------------------
+The Board has approved a $200M buyback programme. For FY2025, management guides
+revenue of $4.8-5.0B, with operating margin expansion of 100-150bps. Key
+investment areas: AI-assisted automation, edge computing, and sustainability.
+
+RISK FACTORS
+------------
+- Macroeconomic uncertainty and enterprise spending delays
+- Competitive pressure from hyperscaler cloud providers
+- Talent acquisition and retention in key engineering roles
+- Regulatory changes in data sovereignty (EU AI Act, DPDPA India)

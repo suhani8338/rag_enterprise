@@ -1,0 +1,40 @@
+# Core RAG & LangChain
+langchain==0.2.16
+langchain-community==0.2.16
+langchain-huggingface==0.0.3
+langchain-chroma==0.1.4
+
+# Vector Store
+chromadb==0.4.24
+
+# Embeddings (free, local)
+torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+sentence-transformers==3.0.1
+
+# Hybrid Search
+rank_bm25==0.2.2
+
+# Document Loaders
+pymupdf==1.24.10        # PDF ingestion
+beautifulsoup4==4.12.3  # HTML ingestion
+openpyxl==3.1.5         # Excel support
+
+# Structured Data
+pandas==2.2.2
+duckdb==1.0.0           # Replaces Snowflake for SQL queries
+sqlalchemy==2.0.31
+
+# Metadata & Tracking
+mlflow==2.15.1
+tqdm==4.66.5
+python-dotenv==1.0.1
+
+# Evaluation (Phase 4, installed now so imports don't break)
+ragas==0.1.21
+
+# Testing
+pytest==8.3.2
+
+# Utilities
+rich==13.7.1             # Pretty terminal output
+pyyaml==6.0.2

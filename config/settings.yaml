@@ -1,0 +1,47 @@
+# config/settings.yaml
+# ─────────────────────────────────────────────
+# Central configuration for the RAG pipeline.
+# All paths are relative to the project root.
+# ─────────────────────────────────────────────
+
+project:
+  name: "Enterprise RAG System"
+  version: "1.0.0"
+
+paths:
+  raw_data:       "data/raw"
+  processed_data: "data/processed"
+  chroma_db:      "data/chroma_db"
+  sqlite_db:      "data/metadata.db"
+  mlflow_uri:     "mlruns"
+
+ingestion:
+  supported_extensions: [".pdf", ".csv", ".txt", ".html", ".md"]
+  batch_size: 50                 # Documents per ingestion batch
+
+chunking:
+  chunk_size: 512                # Characters per chunk
+  chunk_overlap: 64              # Overlap between consecutive chunks
+  separators: ["\n\n", "\n", ". ", " ", ""]
+
+embedding:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  # Free, 384-dim, runs fully offline after first download (~90MB)
+  device: "cpu"                  # Change to "cuda" if GPU available
+  batch_size: 64
+
+vectorstore:
+  collection_name: "enterprise_docs"
+  distance_metric: "cosine"
+  # Hybrid search weights (must sum to 1.0)
+  dense_weight: 0.7
+  sparse_weight: 0.3             # BM25
+
+retrieval:
+  top_k: 10                      # Candidates before re-ranking
+  mmr_lambda: 0.5                # 0 = max diversity, 1 = max relevance
+  final_k: 4                     # Final chunks returned after MMR
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"

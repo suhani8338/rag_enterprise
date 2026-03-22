@@ -1,0 +1,11 @@
+product_id,product_name,category,price_usd,margin_pct,launched,region,status
+P001,AcmeCloud Compute,Cloud,499,72,2021-03,Global,Active
+P002,AcmeDB Managed,Cloud,299,68,2022-06,Global,Active
+P003,AcmeMesh,Cloud,199,80,2023-01,Global,Active
+P004,Acme ERP v12,Software,1200,55,2018-09,NA/EU,Mature
+P005,Acme CRM Pro,Software,800,60,2019-04,Global,Mature
+P006,AcmeEdge Gateway,Hardware,2500,38,2023-08,NA,Active
+P007,Acme Analytics,Cloud,350,75,2024-01,Global,Active
+P008,AcmeAI Studio,Cloud,599,82,2024-07,Global,Beta
+P009,Acme ERP v13,Software,1400,58,2024-09,NA/EU,Active
+P010,AcmeHR,Software,450,62,2020-11,NA/APAC,Mature

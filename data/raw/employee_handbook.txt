@@ -1,0 +1,36 @@
+ACME CORPORATION — EMPLOYEE HANDBOOK (Extract)
+===============================================
+
+REMOTE WORK POLICY
+------------------
+Acme operates a hybrid-first model. Employees are expected in office a minimum
+of 2 days per week (Tuesday and Thursday are anchor days). Fully remote roles
+require VP-level approval and are limited to roles where collaboration cadence
+permits it. All remote employees receive a $1,500 annual home-office stipend.
+
+PERFORMANCE REVIEWS
+-------------------
+Reviews occur twice yearly (June and December). The company uses an OKR-based
+framework. Ratings are: Exceeds Expectations, Meets Expectations, Developing,
+and Underperforming. Bottom-quartile performers receive a 60-day PIP.
+
+COMPENSATION & BENEFITS
+-----------------------
+- Annual merit increases: 3-7% based on performance rating
+- Equity refresh grants at 2-year and 4-year tenure
+- Health insurance: medical, dental, vision (100% premium for employee)
+- 401(k): 4% company match, immediate vesting
+- Learning budget: $2,000/year per employee for courses, conferences, books
+- Parental leave: 16 weeks primary / 8 weeks secondary
+
+CODE OF CONDUCT
+---------------
+All employees must complete annual ethics training. Zero tolerance for:
+discrimination, harassment, insider trading, and conflicts of interest.
+Violations should be reported via the anonymous Ethics Hotline (1-800-ACME-ETH).
+
+DATA HANDLING
+-------------
+Customer data must never be stored on personal devices. All laptops require
+full-disk encryption (BitLocker / FileVault). VPN is required when working
+outside of Acme offices or approved co-working spaces.
