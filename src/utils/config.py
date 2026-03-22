@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH  = PROJECT_ROOT / "config" / "settings.yaml"
 
 
-# ── Phase 1 dataclasses ───────────────────────────────────────────────────────
+# ── Phase 1 ───────────────────────────────────────────────────────────────────
 
 @dataclass
 class PathsConfig:
@@ -58,7 +58,7 @@ class RetrievalConfig:
     mmr_lambda: float
     final_k:    int
 
-# ── Phase 2 dataclasses ───────────────────────────────────────────────────────
+# ── Phase 2 ───────────────────────────────────────────────────────────────────
 
 @dataclass
 class LLMConfig:
@@ -85,14 +85,35 @@ class RAGConfig:
     max_context_chars: int
     cite_sources:      bool
 
-# ── Phase 3 dataclasses ───────────────────────────────────────────────────────
+# ── Phase 3 ───────────────────────────────────────────────────────────────────
 
 @dataclass
 class AgentsConfig:
-    sql_keywords:    List[str]
-    sql_max_rows:    int
-    memory_window:   int
-    synthesis_mode:  str
+    sql_keywords:   List[str]
+    sql_max_rows:   int
+    memory_window:  int
+    synthesis_mode: str
+
+# ── Phase 4 ───────────────────────────────────────────────────────────────────
+
+@dataclass
+class ServingConfig:
+    host:         str
+    port:         int
+    reload:       bool
+    cors_origins: List[str]
+
+@dataclass
+class EvaluationConfig:
+    test_set_path:     str
+    metrics:           List[str]
+    experiment_name:   str
+
+@dataclass
+class SchedulerConfig:
+    refresh_interval_minutes: int
+    changed_files_hours:      int
+    timezone:                 str
 
 
 # ── Master Settings ───────────────────────────────────────────────────────────
@@ -107,13 +128,17 @@ class Settings:
     embedding:       EmbeddingConfig
     vectorstore:     VectorstoreConfig
     retrieval:       RetrievalConfig
-    # Phase 2 (Optional)
+    # Phase 2
     llm:             Optional[LLMConfig]            = field(default=None)
     reranker:        Optional[RerankerConfig]       = field(default=None)
     query_rewriting: Optional[QueryRewritingConfig] = field(default=None)
     rag:             Optional[RAGConfig]            = field(default=None)
-    # Phase 3 (Optional)
+    # Phase 3
     agents:          Optional[AgentsConfig]         = field(default=None)
+    # Phase 4
+    serving:         Optional[ServingConfig]        = field(default=None)
+    evaluation:      Optional[EvaluationConfig]     = field(default=None)
+    scheduler:       Optional[SchedulerConfig]      = field(default=None)
     project_root:    Path = field(default_factory=lambda: PROJECT_ROOT)
 
 
@@ -122,7 +147,6 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
         raw = yaml.safe_load(f)
 
     root = PROJECT_ROOT
-
     paths = PathsConfig(
         raw_data       = root / raw["paths"]["raw_data"],
         processed_data = root / raw["paths"]["processed_data"],
@@ -146,14 +170,13 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
         format = log["format"],
     )
 
-    # Phase 2
+    # ── Phase 2 ───────────────────────────────────────────────────────────────
     llm_cfg = reranker_cfg = qr_cfg = rag_cfg = None
     if "llm" in raw:
         l = raw["llm"]
         llm_cfg = LLMConfig(
-            provider=l["provider"], model=l["model"],
-            base_url=l["base_url"], temperature=l["temperature"],
-            max_tokens=l["max_tokens"],
+            provider=l["provider"], model=l["model"], base_url=l["base_url"],
+            temperature=l["temperature"], max_tokens=l["max_tokens"],
         )
     if "reranker" in raw:
         r = raw["reranker"]
@@ -162,7 +185,9 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
         )
     if "query_rewriting" in raw:
         q = raw["query_rewriting"]
-        qr_cfg = QueryRewritingConfig(enabled=q["enabled"], num_variants=q["num_variants"])
+        qr_cfg = QueryRewritingConfig(
+            enabled=q["enabled"], num_variants=q["num_variants"],
+        )
     if "rag" in raw:
         rc = raw["rag"]
         rag_cfg = RAGConfig(
@@ -171,7 +196,7 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
             cite_sources=rc["cite_sources"],
         )
 
-    # Phase 3
+    # ── Phase 3 ───────────────────────────────────────────────────────────────
     agents_cfg = None
     if "agents" in raw:
         a = raw["agents"]
@@ -180,6 +205,31 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
             sql_max_rows   = a.get("sql_max_rows", 20),
             memory_window  = a.get("memory_window", 6),
             synthesis_mode = a.get("synthesis_mode", "weighted"),
+        )
+
+    # ── Phase 4 ───────────────────────────────────────────────────────────────
+    serving_cfg = eval_cfg = sched_cfg = None
+    if "serving" in raw:
+        s = raw["serving"]
+        serving_cfg = ServingConfig(
+            host         = s.get("host", "0.0.0.0"),
+            port         = s.get("port", 8000),
+            reload       = s.get("reload", False),
+            cors_origins = s.get("cors_origins", ["*"]),
+        )
+    if "evaluation" in raw:
+        e = raw["evaluation"]
+        eval_cfg = EvaluationConfig(
+            test_set_path   = e.get("test_set_path", "data/eval_test_set.json"),
+            metrics         = e.get("metrics", ["faithfulness", "answer_relevancy"]),
+            experiment_name = e.get("experiment_name", "ragas_evaluation"),
+        )
+    if "scheduler" in raw:
+        sc = raw["scheduler"]
+        sched_cfg = SchedulerConfig(
+            refresh_interval_minutes = sc.get("refresh_interval_minutes", 60),
+            changed_files_hours      = sc.get("changed_files_hours", 24),
+            timezone                 = sc.get("timezone", "UTC"),
         )
 
     return Settings(
@@ -216,6 +266,9 @@ def load_settings(config_path: Path = CONFIG_PATH) -> Settings:
         query_rewriting = qr_cfg,
         rag             = rag_cfg,
         agents          = agents_cfg,
+        serving         = serving_cfg,
+        evaluation      = eval_cfg,
+        scheduler       = sched_cfg,
     )
 
 
