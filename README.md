@@ -1,144 +1,129 @@
-# Enterprise RAG System — All Phases
+# Enterprise Multi-Agent RAG System
 
-**Multi-Agent RAG System** | Production-grade, fully local, zero API costs
+**Production-grade, fully local, zero API costs**
+
+A complete multi-agent Retrieval-Augmented Generation system that ingests enterprise documents, indexes them in a vector database, and uses coordinated AI agents to answer complex business queries with grounded, cited responses. Everything runs locally — no cloud accounts, no API keys, no usage fees.
 
 ---
 
-## Full Pipeline Architecture
+## What it does
+
+You drop documents into `data/raw/` and the system handles everything else. It loads PDFs, CSVs, text files, HTML, and Markdown; splits them into overlapping chunks; embeds them with a free local model; and stores them in a persistent vector index with both dense and sparse search. When you ask a question, a supervisor agent classifies your intent and routes to the right specialist — a retriever agent for document questions, a SQL agent for structured data queries, or both in parallel for questions that need both. A synthesizer agent merges the answers into one cited response. The whole thing is served via a FastAPI REST endpoint and a Streamlit chat UI with real-time streaming.
+
+---
+
+## Architecture
 
 ```
-Raw Documents (PDF / CSV / TXT / HTML / MD)
-        ↓  DocumentLoader
-LangChain Documents + rich metadata
-        ↓  DocumentChunker  (RecursiveCharacterTextSplitter)
-        ↓  LocalEmbedder  (all-MiniLM-L6-v2, free, offline)
+Documents (PDF / CSV / TXT / HTML / MD)
+        ↓  DocumentLoader  (PyMuPDF · pandas · BeautifulSoup)
+        ↓  DocumentChunker  (RecursiveCharacterTextSplitter · size=512 overlap=64)
+        ↓  LocalEmbedder  (all-MiniLM-L6-v2 · 384-dim · free · offline)
         ↓  ChromaVectorStore  (ChromaDB + BM25 hybrid + MMR)
-                                                      ← PHASE 1 COMPLETE
-──────────────────────────────────────────────────────────────────────────
-        ↓  QueryRewriter  (3 search variants)
-        ↓  Hybrid retrieval + CrossEncoderReranker
-        ↓  PromptTemplate (persona) + Ollama + Mistral 7B
-Grounded, cited answer (RAGResponse)
-                                                      ← PHASE 2 COMPLETE
-──────────────────────────────────────────────────────────────────────────
+        ↓  SQLite  (dim_source + fact_chunk metadata · products table)
+                                        ↑ indexed once, queried on every turn
+────────────────────────────────────────────────────────────────────────────────
 User question
-        ↓  SupervisorAgent  → intent + agent_route
-        ├── rag   → RetrieverAgent  (Phase 2 RAGChain)    ─┐
-        ├── sql   → SQLAgent  (Text→SQL→SQLite)            ├─► SynthesizerAgent
-        └── both  → RetrieverAgent + SQLAgent (parallel)  ─┘
-                                                      ← PHASE 3 COMPLETE
-──────────────────────────────────────────────────────────────────────────
-        ↓  FastAPI  (REST: /ask, /ask/stream, /health, /status)
-        ↓  Streamlit UI  (chat + agent trace panel + streaming SSE)
-        ↓  RAGAS Evaluation  (faithfulness, relevancy, context precision)
-        ↓  APScheduler  (auto data refresh → re-embed → index update)
-        ↓  MLflow  (all experiments, metrics, artifacts across all phases)
-                                                      ← PHASE 4 COMPLETE
+        ↓  SupervisorAgent
+              keyword heuristic → Qwen 1.7B fallback
+              → intent: rag | sql | both | chitchat
+              → agent_route
+
+        ├── rag   ──► RetrieverAgent
+        │               QueryRewriter (Qwen 1.7B → 3 variants)
+        │               hybrid retrieval → CrossEncoderReranker (ms-marco-MiniLM)
+        │               PromptTemplate (persona) → Qwen 1.7B → grounded answer
+        │
+        ├── sql   ──► SQLAgent
+        │               Qwen 1.7B text→SQL → SQLite → natural language answer
+        │
+        └── both  ──► RetrieverAgent + SQLAgent  (parallel)
+                            ↓
+                      SynthesizerAgent
+                        merge · cite · update chat_history
+                            ↓
+                      final_answer + sources
+────────────────────────────────────────────────────────────────────────────────
+FastAPI  (/ask · /ask/stream · /health · /status · /history)
+Streamlit UI  (chat · agent trace panel · SSE streaming · persona selector)
+RAGAS Evaluation  (faithfulness · answer relevancy · context precision)
+APScheduler  (scan data/raw/ → re-embed changed files → update ChromaDB)
 ```
 
 ---
 
 ## Quick Start
 
-```bash
+```powershell
 # 1. Virtual environment
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 
 # 2. Dependencies
 pip install -r requirements.txt
 
-# 3. Ollama (install from https://ollama.com, then:)
-ollama pull mistral
+# 3. Install Ollama from https://ollama.com, then pull the model
+ollama pull qwen2:1.7b
 
-# 4. Sample data + index
+# 4. Generate sample documents and index them
 python scripts/generate_sample_data.py
 python -m src.pipeline
 
-# 5. Test each phase
-python -m src.rag_pipeline --question "What is our parental leave policy?"
+# 5. Ask a question via the agent system
 python -m src.agent_pipeline --question "How many cloud products do we have?"
+python -m src.agent_pipeline --question "What is our parental leave policy?"
 
 # 6. Start the API
 uvicorn src.serving.api:app --host 0.0.0.0 --port 8000
 
-# 7. Start the Streamlit UI (in a second terminal)
+# 7. Start the Streamlit UI (new terminal)
 streamlit run src/serving/streamlit_app.py
 ```
 
 ---
 
-## Phase 1 — Ingestion & Indexing
+## CLI Reference
 
-```bash
-python -m src.pipeline                                    # index data/raw/
-python -m src.pipeline --file path/to/report.pdf         # single file
-python -m src.pipeline --query "Q4 revenue" --mode mmr   # test retrieval
-python -m src.pipeline --status                          # index stats
-python -m src.pipeline --reset                           # wipe & re-index
-pytest tests/test_phase1.py -v
+### Document ingestion
+
+```powershell
+python -m src.pipeline                                   # index data/raw/
+python -m src.pipeline --file path\to\report.pdf        # single file
+python -m src.pipeline --query "Q4 revenue" --mode mmr  # test retrieval
+python -m src.pipeline --status                         # index stats
+python -m src.pipeline --reset                          # wipe and re-index
 ```
 
----
+### RAG pipeline (direct, no agents)
 
-## Phase 2 — RAG Pipeline
-
-```bash
+```powershell
 python -m src.rag_pipeline --question "What is our parental leave policy?"
 python -m src.rag_pipeline --question "Summarise Q4" --persona executive
 python -m src.rag_pipeline --question "How does AcmeMesh work?" --persona engineer
 python -m src.rag_pipeline --compare "cloud" "software"
 python -m src.rag_pipeline --summarise
 python -m src.rag_pipeline --interactive
-pytest tests/test_phase2.py -v
 ```
 
 Interactive commands: `/persona <n>` · `/mode <dense|hybrid|mmr>` · `/summarise` · `/quit`
 
----
+### Multi-agent system
 
-## Phase 3 — Multi-Agent System
-
-```bash
+```powershell
 python -m src.agent_pipeline --question "How many cloud products do we have?"
 python -m src.agent_pipeline --question "What is our remote work policy?"
 python -m src.agent_pipeline --question "What does AcmeMesh cost and how does it work?"
 python -m src.agent_pipeline --trace "Which products launched in 2024?"
 python -m src.agent_pipeline --interactive
-pytest tests/test_phase3.py -v
 ```
 
 Interactive commands: `/persona <n>` · `/trace` · `/memory` · `/reset` · `/quit`
 
----
-
-## Phase 4 — Serving, Evaluation & Scheduling
-
 ### FastAPI server
 
-```bash
-# Start
+```powershell
 uvicorn src.serving.api:app --host 0.0.0.0 --port 8000
-
-# Interactive API docs
-open http://localhost:8000/docs
-
-# Test endpoints directly
-curl http://localhost:8000/health
-curl -X POST http://localhost:8000/ask \
-     -H "Content-Type: application/json" \
-     -d '{"question": "What is our parental leave policy?", "persona": "analyst"}'
-
-# Multi-turn with session
-curl -X POST http://localhost:8000/ask \
-     -H "X-Session-Id: my-session" \
-     -H "Content-Type: application/json" \
-     -d '{"question": "How many cloud products?", "persona": "analyst"}'
-
-curl -X POST http://localhost:8000/history/reset \
-     -H "X-Session-Id: my-session"
 ```
-
-**API endpoints:**
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -149,71 +134,52 @@ curl -X POST http://localhost:8000/history/reset \
 | GET | `/history` | Session chat history |
 | POST | `/history/reset` | Clear session memory |
 
+```powershell
+# Test from PowerShell
+Invoke-RestMethod -Uri http://localhost:8000/health
+
+Invoke-RestMethod -Uri http://localhost:8000/ask `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body '{"question": "What is our parental leave policy?", "persona": "analyst"}'
+```
+
 ### Streamlit UI
 
-```bash
-# Requires the FastAPI server to be running
+```powershell
 streamlit run src/serving/streamlit_app.py
 # Opens at http://localhost:8501
 ```
 
-Features: streaming chat · agent trace panel · persona selector ·
-index stats · example questions · session memory with clear button.
+Features: streaming chat · agent trace panel (intent, route, SQL query per turn) ·
+persona selector · index stats · example questions · session memory with clear button.
 
-### RAGAS Evaluation
+### RAGAS evaluation
 
-```bash
-# Generate the default test set file (8 questions)
-python -m src.evaluation.ragas_eval --generate
-# Edit data/eval_test_set.json to add your own questions
-
-# Run full evaluation (scores all questions, logs to MLflow)
-python -m src.evaluation.ragas_eval
-
-# Limit to 3 questions (faster, for testing)
-python -m src.evaluation.ragas_eval --questions 3
-
-# Change persona
-python -m src.evaluation.ragas_eval --persona executive
+```powershell
+python -m src.evaluation.ragas_eval --generate   # write default test set
+python -m src.evaluation.ragas_eval              # run full evaluation
+python -m src.evaluation.ragas_eval --questions 3  # faster — 3 questions only
 ```
 
-Results saved to `data/eval_results.json` and logged to MLflow
-experiment `ragas_evaluation`.
+Results saved to `data/eval_results.json`. Scores faithfulness, answer relevancy,
+and context precision using Qwen 1.7B as the judge.
 
-### APScheduler (data refresh)
+### Data refresh scheduler
 
-```bash
-# Run the scheduler loop (checks every 60 min by default)
-python -m src.scheduler.refresh_scheduler
-
-# Run one refresh cycle and exit
-python -m src.scheduler.refresh_scheduler --once
-
-# Override interval and window
+```powershell
+python -m src.scheduler.refresh_scheduler --once      # single cycle
+python -m src.scheduler.refresh_scheduler             # continuous loop
 python -m src.scheduler.refresh_scheduler --interval 30 --hours 6
 ```
 
-The scheduler scans `data/raw/` for files modified within the last 24 hours,
-re-ingests them, deletes their old chunks from ChromaDB, adds the new ones,
-rebuilds the BM25 index, and logs the run to MLflow.
-
-### MLflow (all phases)
-
-```bash
-mlflow ui
-# Open http://localhost:5000
-```
-
-Experiments logged:
-- `phase1_ingestion` — chunk counts, embedding throughput
-- `rag_query`        — retrieval counts, reranker latency, RAG latency
-- `ragas_evaluation` — faithfulness, answer_relevancy, context_precision
-- `scheduled_refresh` — changed files, new chunks per run
+Scans `data/raw/` for recently modified files, re-ingests them, removes stale
+ChromaDB chunks, adds new ones, and rebuilds the BM25 index.
 
 ### Run all tests
 
-```bash
-pytest tests/ -v
+```powershell
+pytest tests\ -v
 ```
 
 ---
@@ -227,7 +193,7 @@ rag_enterprise/
 ├── pyproject.toml
 │
 ├── config/
-│   └── settings.yaml                  # All tunable parameters (all phases)
+│   └── settings.yaml                  # All tunable parameters
 │
 ├── data/
 │   ├── raw/                           # Drop your documents here
@@ -237,51 +203,49 @@ rag_enterprise/
 │   ├── eval_test_set.json             # RAGAS test questions (auto-generated)
 │   └── eval_results.json              # RAGAS results (auto-generated)
 │
-├── mlruns/                            # MLflow experiment logs (auto-created)
-│
 ├── scripts/
-│   └── generate_sample_data.py
+│   └── generate_sample_data.py        # Creates 4 realistic sample documents
 │
 ├── src/
-│   ├── ingestion/                     # ── PHASE 1 ──
-│   │   ├── document_loader.py
-│   │   └── chunker.py
+│   ├── ingestion/
+│   │   ├── document_loader.py         # PDF / CSV / TXT / HTML / MD loaders
+│   │   └── chunker.py                 # RecursiveCharacterTextSplitter + metadata
 │   ├── embedding/
-│   │   └── embedder.py
+│   │   └── embedder.py                # all-MiniLM-L6-v2 · free · offline
 │   ├── vectorstore/
-│   │   └── chroma_store.py
+│   │   └── chroma_store.py            # ChromaDB + BM25 hybrid search + MMR
 │   │
-│   ├── rag/                           # ── PHASE 2 ──
-│   │   ├── llm_factory.py
-│   │   ├── query_rewriter.py
-│   │   ├── reranker.py
-│   │   ├── prompt_templates.py
-│   │   └── rag_chain.py
+│   ├── rag/
+│   │   ├── llm_factory.py             # Builds Qwen 1.7B via Ollama (stub fallback)
+│   │   ├── query_rewriter.py          # LLM-based query expansion (3 variants)
+│   │   ├── reranker.py                # cross-encoder/ms-marco re-ranking
+│   │   ├── prompt_templates.py        # Persona prompts + context formatter
+│   │   └── rag_chain.py               # Full RAG pipeline → RAGResponse
 │   │
-│   ├── agents/                        # ── PHASE 3 ──
-│   │   ├── state.py
-│   │   ├── supervisor_agent.py
-│   │   ├── retriever_agent.py
-│   │   ├── sql_agent.py
-│   │   ├── synthesizer_agent.py
-│   │   └── graph.py
+│   ├── agents/
+│   │   ├── state.py                   # AgentState TypedDict (shared graph state)
+│   │   ├── supervisor_agent.py        # Intent classification + routing
+│   │   ├── retriever_agent.py         # Wraps RAGChain as a LangGraph node
+│   │   ├── sql_agent.py               # Text→SQL→SQLite→natural-language answer
+│   │   ├── synthesizer_agent.py       # Merges answers + updates memory
+│   │   └── graph.py                   # LangGraph state machine + AgentSystem
 │   │
-│   ├── serving/                       # ── PHASE 4 ──
+│   ├── serving/
 │   │   ├── api.py                     # FastAPI app
 │   │   └── streamlit_app.py           # Streamlit chat UI
 │   ├── evaluation/
-│   │   └── ragas_eval.py              # RAGAS scoring + MLflow logging
+│   │   └── ragas_eval.py              # RAGAS scoring
 │   ├── scheduler/
 │   │   └── refresh_scheduler.py       # APScheduler refresh pipeline
 │   │
 │   ├── utils/
-│   │   ├── config.py
-│   │   ├── logger.py
-│   │   └── metadata_store.py
+│   │   ├── config.py                  # Typed settings loaded from YAML
+│   │   ├── logger.py                  # Logging helpers
+│   │   └── metadata_store.py          # SQLite schema
 │   │
-│   ├── pipeline.py                    # Phase 1 CLI
-│   ├── rag_pipeline.py                # Phase 2 CLI
-│   └── agent_pipeline.py              # Phase 3 CLI
+│   ├── pipeline.py                    # Ingestion CLI
+│   ├── rag_pipeline.py                # RAG CLI
+│   └── agent_pipeline.py              # Agent CLI
 │
 └── tests/
     ├── test_phase1.py                 # 15 tests
@@ -292,56 +256,57 @@ rag_enterprise/
 
 ---
 
-## Tuning Parameters (settings.yaml)
+## Tuning Parameters
 
-### Phase 1
+Edit `config/settings.yaml` to change any of these without touching code:
+
+### Ingestion & indexing
 | Parameter | Default | Effect |
 |---|---|---|
 | `chunking.chunk_size` | 512 | Larger = more context per chunk |
 | `chunking.chunk_overlap` | 64 | Larger = less info loss at boundaries |
-| `vectorstore.dense_weight` | 0.7 | Cosine similarity weight |
-| `vectorstore.sparse_weight` | 0.3 | BM25 keyword weight |
+| `vectorstore.dense_weight` | 0.7 | Cosine similarity weight in hybrid search |
+| `vectorstore.sparse_weight` | 0.3 | BM25 keyword weight in hybrid search |
 | `retrieval.top_k` | 10 | Candidates before re-ranking |
-| `retrieval.final_k` | 4 | Chunks after MMR |
+| `retrieval.final_k` | 4 | Chunks passed to LLM after MMR |
 | `embedding.device` | cpu | Change to `cuda` if GPU available |
 
-### Phase 2
+### LLM & RAG
 | Parameter | Default | Effect |
 |---|---|---|
-| `llm.model` | mistral | Any Ollama model (llama3, phi3, etc.) |
-| `llm.temperature` | 0.1 | Lower = more deterministic |
-| `reranker.top_n` | 4 | Final chunks to LLM |
+| `llm.model` | qwen2:1.7b | Any model pulled via Ollama |
+| `llm.temperature` | 0.1 | Lower = more deterministic answers |
+| `reranker.top_n` | 4 | Final chunks after cross-encoder scoring |
 | `query_rewriting.num_variants` | 3 | More = higher recall, slower |
-| `rag.default_persona` | analyst | Default tone |
-| `rag.max_context_chars` | 6000 | Context window budget |
+| `rag.default_persona` | analyst | analyst / executive / engineer / hr |
+| `rag.max_context_chars` | 6000 | Hard limit on context fed to LLM |
 
-### Phase 3
+### Agents
 | Parameter | Default | Effect |
 |---|---|---|
-| `agents.sql_max_rows` | 20 | Max SQL result rows |
+| `agents.sql_max_rows` | 20 | Max rows returned from SQLite |
 | `agents.memory_window` | 6 | Chat turns kept in context |
 | `agents.synthesis_mode` | weighted | weighted / concat / llm_merge |
 
-### Phase 4
+### Serving & evaluation
 | Parameter | Default | Effect |
 |---|---|---|
 | `serving.port` | 8000 | FastAPI port |
-| `serving.cors_origins` | localhost:8501 | Allowed origins |
 | `evaluation.metrics` | faithfulness, answer_relevancy, context_precision | RAGAS metrics |
 | `scheduler.refresh_interval_minutes` | 60 | How often to scan for changes |
-| `scheduler.changed_files_hours` | 24 | Files modified within this window are re-indexed |
+| `scheduler.changed_files_hours` | 24 | Re-index files modified within this window |
 
 ---
 
 ## Free Local Stack
 
-| Production tool | Local replacement |
+| Production equivalent | What's used here |
 |---|---|
 | AWS S3 | `data/` directory |
 | Snowflake | SQLite + DuckDB |
 | Pinecone / Weaviate | ChromaDB |
 | OpenAI embeddings | `all-MiniLM-L6-v2` |
-| GPT-4 | Ollama + Mistral 7B |
+| GPT-4 | Qwen 1.7B via Ollama |
 | Cohere Rerank | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | AutoGen / CrewAI | LangGraph |
 | AWS ECS / Docker | FastAPI + uvicorn |
